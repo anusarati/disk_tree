@@ -11,5 +11,5 @@ It might not work well with std dynamically allocated types (e.g. std::string) b
 ## LICENSE
 0BSD
 
-Thanks to the Buddha, Wikipedia, en.cppreference.com, the C++ standards committee or
+Thanks to the Buddha, Wikipedia, en.cppreference.com and devdocs.io, the C++ standards committee or
 working group, and anyone else who helped me.

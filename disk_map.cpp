@@ -100,6 +100,10 @@ template<typename dt, typename rt, typename ArgCompare=std::less<dt>> struct dis
 	{
 		return inner_find(arg);
 	}
+	// https://en.cppreference.com/w/cpp/container/map/lower_bound
+	iterator lower_bound(const dt& arg) { return tree.lower_bound(incomplete_pair(arg)); }
+	// https://en.cppreference.com/w/cpp/container/map/upper_bound
+	iterator upper_bound(const dt& arg) { return tree.upper_bound(incomplete_pair(arg)); }
 	iterator erase(const iterator& i)
 	{
 		return tree.erase(incomplete_pair(i.inner));

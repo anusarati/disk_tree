@@ -789,27 +789,74 @@ template<typename dt,typename Compare=std::less<dt>> struct disk_tree // https:/
 		end_memo=move(i); updated_memo=true;
 		return end_memo;
 	}
-	// does not check for the presence of root, done in insertion
-	iterator find(const dt& d)
+	enum approach_r { less, greater, equal }
+	approach_r approach(const dt& d,iterator& i)
 	{
-		iterator i{root};
 		while (true)
 		{
 			auto r=(reference)i;
 			if (compare(d,r->d))
 			{
 				// left returns whether the node had a left branch to move to, and moves the iterator there if it does
-				if (!i.left(r)) return end();
+				if (!i.left(r)) return less; // less than closest
 			}
 			else if (compare(r->d,d))
 			{
-				if (!i.right(r)) return end();
+				if (!i.right(r)) return greater;
 			}
 			else
 			{
-				return i;
+				return equal;
 			}
 		}
+	}
+	iterator find(const dt& d)
+	{
+		if (root)
+		{
+			iterator i{root};
+			switch (approach(d,i))
+			{
+				case less: [[fallthrough]]
+				case greater:
+					return end();
+				case equal:
+					return i;
+			}
+		} return end(); // I realized the case when find is called on an empty tree for some reason
+	}
+	// https://en.cppreference.com/w/cpp/container/set/lower_bound
+	iterator lower_bound(const dt& d)
+	{
+		if (root)
+		{
+			iterator i{root};
+			switch (approach(d,i))
+			{
+				case less: [[fallthrough]]
+				case equal:
+					return i;
+				case greater:
+					return end();
+			}
+		} return end();
+	}
+	// https://en.cppreference.com/w/cpp/container/set/upper_bound
+	iterator upper_bound(const dt& d)
+	{
+		if (root)
+		{
+			iterator i{root};
+			switch (approach(d,i))
+			{
+				case less:
+					return i;
+				case greater:
+					return end();
+				case equal:
+					return ++i;
+			}
+		} return end();
 	}
 	void popBalance(const iterator& i, bool depthDecreased)
 	{
