@@ -108,27 +108,5 @@ template<typename dt, typename rt, typename ArgCompare=std::less<dt>> struct dis
 	{
 		return tree.erase(incomplete_pair(i.inner));
 	}
-	struct reverse_iterator
-	{
-		tree_t::reverse_iterator inner;
-		reverse_iterator& operator ++() { ++inner; return *this; }
-		reverse_iterator& operator --() { --inner; return *this; }
-		reverse_iterator& operator ++(int) { auto before=*this; ++inner; return before; }
-		reverse_iterator& operator --(int) { auto before=*this; --inner; return before; }
-		operator tree_t::pointer() { return typename tree_t::pointer(forward); }
-		// https://en.cppreference.com/w/cpp/language/explicit
-		explicit operator tree_t::pointer&() { return (typename tree_t::pointer&)(forward); }
-		//https://en.cppreference.com/w/cpp/language/operators
-		iterator operator ->() { return forward; }
-		operator tree_t::reference() const { return typename tree_t::reference(forward); }
-	};
-	reverse_iterator rbegin()
-	{
-		return tree.rbegin();
-	}
-	reverse_iterator rend()
-	{
-		return tree.rend();
-	}
 	void clear() { tree.clear(); }
 };
