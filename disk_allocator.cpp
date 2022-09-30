@@ -1,4 +1,3 @@
-#include "bistream.cpp"
 #include <cstdio>
 #include <iostream>
 #include <cinttypes>
@@ -7,6 +6,8 @@ using namespace std;
 // allocates one t at a time
 template<typename t> struct disk_allocator
 {
+	// https://en.cppreference.com/w/cpp/io/c/FILE
+	// thanks to The Cherno or whoever else taught me C++
 	inline static FILE *dstream=nullptr, *sstream=nullptr; // for data and memory spaces
 	inline static void seek(FILE* s,const size_t& l) { fseek(s,l,SEEK_SET); }
 	inline static void seek(const size_t& l) { fseek(dstream,l,SEEK_SET); }
@@ -28,6 +29,8 @@ template<typename t> struct disk_allocator
 	{
 		t d; size_t l;
 		inline void read() { seek(l); disk_allocator<t>::read(d,dstream); }
+		//https://stackoverflow.com/a/31211386
+		reference() { l=SIZE_MAX; }
 		reference(const size_t& p) : l(p) { read(); }
 		reference(const reference& r) : d(r.d), l(r.l) {}
 		void write() const
@@ -36,6 +39,7 @@ template<typename t> struct disk_allocator
 			seek(l);
 			disk_allocator<t>::write(d,dstream);
 		}
+		// = for another reference should go through constructor instead of this
 		reference& operator =(const auto& o)
 		{
 			d=o; write();
@@ -53,7 +57,7 @@ template<typename t> struct disk_allocator
 			return pointer{l};
 		}
 		//auto operator <=>(const reference& o) const { return d<=>o.d; }
-		~reference()=default;
+		//~reference()=default;
 		//~reference() { cout<<"destroy "<<d.d<<endl<<l<<endl; write(); }
 	};
 	//https://stackoverflow.com/a/16998837

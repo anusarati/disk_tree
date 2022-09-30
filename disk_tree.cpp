@@ -10,7 +10,7 @@ using namespace std;
 // also supposed to mimic part of std::set, implemented as red-black tree by GCC
 // it doesn't attempt to insert data that isn't ordered before or after with compare
 // licensed under 0 BSD
-template<typename dt,typename Compare=std::less<dt>> struct disk_tree
+template<typename dt,typename Compare=std::less<dt>> struct disk_tree // https://en.cppreference.com/w/cpp/named_req/Compare
 {
 	// the allocations are for nodes
 	struct node;
@@ -20,6 +20,10 @@ template<typename dt,typename Compare=std::less<dt>> struct disk_tree
 	static void init_allocator()
 	{
 		disk_allocator<node>::init();
+	}
+	static void init_allocator(auto&& dstream, auto&& sstream)
+	{
+		disk_allocator<node>::init(dstream,sstream);
 	}
 	using pointer=disk_allocator<node>::pointer;
 	using reference=disk_allocator<node>::reference;
@@ -758,7 +762,7 @@ template<typename dt,typename Compare=std::less<dt>> struct disk_tree
 		explicit operator pointer&() { return nodes[level]; }
 		//https://en.cppreference.com/w/cpp/language/operators
 		pointer operator ->() { return nodes[level]; }
-		operator reference() { return *nodes[level]; }
+		operator reference() const { return *nodes[level]; }
 	};
 	// logarithmic time begin and end instead of constant https://en.cppreference.com/w/cpp/container/set/begin
 	// I thought it would be better than updating begin and end with each insertion or erasure
@@ -785,6 +789,7 @@ template<typename dt,typename Compare=std::less<dt>> struct disk_tree
 		end_memo=move(i); updated_memo=true;
 		return end_memo;
 	}
+	// does not check for the presence of root, done in insertion
 	iterator find(const dt& d)
 	{
 		iterator i{root};
@@ -897,119 +902,4 @@ template<typename dt,typename Compare=std::less<dt>> struct disk_tree
 #endif
 };
 
-// attempt to mimic some of std::map
-template<typename dt, typename rt, typename ArgCompare> struct disk_map
-{
-	// thanks to GCC and en.cppreference.com for reminding me that a normal std::map is not a std::multimap and doesn't need multiple rt for one dt and that I don't need to implement multimap by wrapping the second member with another disk_tree
-	using pt=pair<const dt,rt>; 
-	struct Compare
-	{
-		static constexpr ArgCompare c{};
-		bool operator ()(const pt& a, const pt& b) { return c(a.first,b.first); }
-	};
-	using tree_t=disk_tree<pt,Compare>;
-	struct mapped_t // use auto instead of rt when replacing std::map
-	{
-		tree_t::iterator i;
-		mapped_t& operator =(const rt& right)
-		{
-			auto r=tree_t::reference(i);
-			r->second=right; // fortunately the iterator isn't const qualified ( if you want const qualification for a disk_set you can just use a const parameter for disk_tree )
-			r.write();
-		}
-		operator rt() { return *i; }
-	};
-	tree_t tree;
-	size_t size() { return tree.size(); }
-	mapped_t at(const dt& arg)
-	{
-		return tree.find(arg);
-	}
-	mapped_t operator [](const dt& arg)
-	{
-		auto i=tree.find(arg);
-		if (i==tree.end())
-		{
-			tree.insert(arg);
-			i=tree.find(arg);
-		}
-		return i;
-	}
-	pair<auto,bool> insert(const dt& d)
-	{
-		auto i=tree.insert(d);
-		return make_pair(iterator{i.first},i.second);
-	}
-	inline bool erase(const dt& d) { return tree.erase(d); }
-	struct iterator
-	{
-		tree_t::iterator inner;
-		pt operator *()
-		{
-			return *inner;
-		}
-		auto operator ->() { return inner; } // for ->first or ->second
-		iterator& operator ++() { ++inner; return *this; }
-		iterator& operator --() { --inner; return *this; }
-		iterator operator ++(int) { auto before=*this; ++inner; return before; } // I haven't checked to see if it actually copies the iterator's nodes data
-		iterator operator --(int) { auto before=*this; --inner; return before; }
-		bool operator ==(const iterator& o) { return inner==o.inner; }
-		operator tree_t::iterator() { return inner; }
-	};
-	iterator begin() { return tree.begin(); }
-	iterator end() { return tree.end(); }
-	iterator find(const dt& arg)
-	{
-		return tree.find(arg);
-	}
-	iterator erase(const iterator& i)
-	{
-		return tree.erase(i.inner);
-	}
-	void clear() { tree.clear(); }
-};
 
-// https://en.wikipedia.org/wiki/Trie
-// but this is logarithmic complexity
-/*
-template<typename dt> struct binary_search_trie
-{
-	struct node
-	{
-		dt d;
-		tree<node> t;
-		auto operator <=>(const node& n) const
-		{
-			return d<=>n.d;
-		}
-	};
-	tree<node> root;
-
-	struct iterator
-	{
-		stack<typename tree<node>::iterator,forward_list<typename tree<node>::iterator>> iterators; 
-		stack<node*,forward_list<node*>> nodes;
-#define step(sym,t)\
-		iterator operator sym ()\
-		{\
-			auto i=iterators.top();\
-			sym i;\
-			while (i==nodes.top()->t())\
-			{\
-				iterators.pop(); nodes.pop();\
-				i=iterators.top();\
-				sym i;\
-			}\
-			return *this;\
-		}
-		step(++,end); step(--,begin);
-		bool operator==(const iterator& i)
-		{
-			return iterators.top()==i.iterators.top(); // compares node pointers
-		}
-		dt operator*() { return *iterators.top(); }
-		node* operator->() { return *nodes.top(); }
-		tree<node>::iterator inner() { return iterators.top(); }
-	};
-};
-*/
