@@ -698,6 +698,8 @@ template<typename dt,typename Compare=std::less<dt>> struct disk_tree // https:/
 			}
 			return dt{};
 		}
+		// thanks to GCC for showing me that postfix ++ has int parameter
+		// https://en.cppreference.com/w/cpp/language/operators
 		iterator operator ++(int) { auto before=*this; operator ++(); return before; }
 		iterator& operator --()
 		{
@@ -789,7 +791,9 @@ template<typename dt,typename Compare=std::less<dt>> struct disk_tree // https:/
 		end_memo=move(i); updated_memo=true;
 		return end_memo;
 	}
-	enum approach_r { less, greater, equal }
+	// thanks to cppreference for showing enum definition in one line
+	// https://en.cppreference.com/w/cpp/language/enum
+	enum approach_r { less, greater, equal };
 	approach_r approach(const dt& d,iterator& i)
 	{
 		while (true)
@@ -817,7 +821,7 @@ template<typename dt,typename Compare=std::less<dt>> struct disk_tree // https:/
 			iterator i{root};
 			switch (approach(d,i))
 			{
-				case less: [[fallthrough]]
+				case less: [[fallthrough]];
 				case greater:
 					return end();
 				case equal:
@@ -833,7 +837,7 @@ template<typename dt,typename Compare=std::less<dt>> struct disk_tree // https:/
 			iterator i{root};
 			switch (approach(d,i))
 			{
-				case less: [[fallthrough]]
+				case less: [[fallthrough]];
 				case equal:
 					return i;
 				case greater:
@@ -895,6 +899,28 @@ template<typename dt,typename Compare=std::less<dt>> struct disk_tree // https:/
 		else extract(nullptr,false,np,r,depthDecreased);
 		return preserved_node{move(r)};
 	}
+	struct reverse_iterator
+	{
+		iterator forward;
+		reverse_iterator& operator ++() { --forward; return *this; }
+		reverse_iterator& operator --() { ++forward; return *this; }
+		reverse_iterator& operator ++(int) { auto before=*this; --forward; return before; }
+		reverse_iterator& operator --(int) { auto before=*this; ++forward; return before; }
+		operator pointer() { return pointer(forward); }
+		// https://en.cppreference.com/w/cpp/language/explicit
+		explicit operator pointer&() { return (pointer&)(forward); }
+		//https://en.cppreference.com/w/cpp/language/operators
+		pointer operator ->() { return forward; }
+		operator reference() const { return reference(forward); }
+	};
+	reverse_iterator rbegin()
+	{
+		return --end();
+	}
+	reverse_iterator rend()
+	{
+		return --begin();
+	}
 	dt front()
 	{
 		return *root->minNode()->first;
@@ -949,4 +975,8 @@ template<typename dt,typename Compare=std::less<dt>> struct disk_tree // https:/
 #endif
 };
 
-
+// https://en.cppreference.com/w/cpp/iterator/make_reverse_iterator
+template<typename dt, typename Compare> disk_tree<dt,Compare>::reverse_iterator make_reverse_iterator(disk_tree<dt,Compare>::iterator i)
+{
+	return disk_tree<dt,Compare>::reverse_iterator(i);
+}
