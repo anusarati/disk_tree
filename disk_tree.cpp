@@ -377,6 +377,7 @@ template<typename dt,typename Compare=std::less<dt>> struct disk_tree // https:/
 			al.deallocate(&m);
 			eraseDepthBalance<true>(nr,depthDecreased);
 		}
+		--n;
 	}
 	// https://en.cppreference.com/w/cpp/container/node_handle
 	// https://eel.is/c++draft/container.node
@@ -438,6 +439,7 @@ template<typename dt,typename Compare=std::less<dt>> struct disk_tree // https:/
 			}
 			else root=&m;
 		}
+		--n;
 	}
 	template<bool leftwards> void eraseDepthBalance(reference& nr, bool& depthDecreased)
 	{
@@ -583,9 +585,7 @@ template<typename dt,typename Compare=std::less<dt>> struct disk_tree // https:/
 		cout<<"erase "<<d<<endl;
 #endif
 		bool b=false;
-		bool erased=erase(root,d,b);
-		if (erased) n--;
-		return erased;
+		return erase(root,d,b);
 	}
 	struct iterator // consumes a lot of space, not good for parallel iteration on small trees
 	{
@@ -777,7 +777,9 @@ template<typename dt,typename Compare=std::less<dt>> struct disk_tree // https:/
 		// https://en.cppreference.com/w/cpp/language/explicit
 		explicit operator pointer&() { return nodes[level]; }
 		//https://en.cppreference.com/w/cpp/language/operators
-		pointer operator ->() { return nodes[level]; }
+		// using -> multiple times on same iterator can result in unnecessary disk accesses
+		// let ->() access member of dt d
+		dt* operator ->() { return &nodes[level]->d; }
 		operator reference() const { return *nodes[level]; }
 	};
 	// logarithmic time begin and end instead of constant https://en.cppreference.com/w/cpp/container/set/begin
