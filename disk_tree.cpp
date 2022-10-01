@@ -497,6 +497,8 @@ template<typename dt,typename Compare=std::less<dt>> struct disk_tree // https:/
 	{
 		for (auto& d:l) insert(d);
 	}
+	// convert from std::set
+	disk_tree(const set<dt,Compare>& counterpart ) { for (auto&& d:counterpart) insert(d); }
 	template<typename iterator_t> disk_tree(iterator_t i, const iterator_t& e)
 	{
 		while (i!=e)
