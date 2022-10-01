@@ -904,6 +904,9 @@ template<typename dt,typename Compare=std::less<dt>> struct disk_tree // https:/
 	struct reverse_iterator
 	{
 		iterator forward;
+		// https://en.cppreference.com/w/cpp/iterator/make_reverse_iterator
+		reverse_iterator(iterator&& i) { forward=i; --forward; }
+		reverse_iterator(iterator& i) { forward=move(i); --forward; }
 		reverse_iterator& operator ++() { --forward; return *this; }
 		reverse_iterator& operator --() { ++forward; return *this; }
 		reverse_iterator& operator ++(int) { auto before=*this; --forward; return before; }
@@ -917,12 +920,14 @@ template<typename dt,typename Compare=std::less<dt>> struct disk_tree // https:/
 	};
 	reverse_iterator rbegin()
 	{
-		return --end();
+		// https://en.cppreference.com/w/cpp/iterator/make_reverse_iterator
+		return end(); // forward iterator is decremented in constructor
 	}
 	reverse_iterator rend()
 	{
-		return --begin();
+		return begin();
 	}
+	static reverse_iterator make_reverse_iterator(iterator i) { return reverse_iterator(i); }
 	dt front()
 	{
 		return *root->minNode()->first;
@@ -976,9 +981,3 @@ template<typename dt,typename Compare=std::less<dt>> struct disk_tree // https:/
 	bool wellOrderedUnique() { return root->wellOrderedUnique(); }
 #endif
 };
-
-// https://en.cppreference.com/w/cpp/iterator/make_reverse_iterator
-template<typename dt, typename Compare> disk_tree<dt,Compare>::reverse_iterator make_reverse_iterator(typename disk_tree<dt,Compare>::iterator i)
-{
-	return disk_tree<dt,Compare>::reverse_iterator(i);
-}
