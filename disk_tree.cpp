@@ -139,6 +139,16 @@ template<typename dt,typename Compare=std::less<dt>> struct disk_tree // https:/
 			return true;
 		}
 #endif
+		// thanks to Wikipedia articles on graphs
+		// used to implement contains
+		// thanks to GCC and gdb for showing me that contains calls find or something like that
+		// search for d in tree with binary search, if it can't be found it's not there
+		bool reachable(const dt& d)
+		{
+			if (compare(d,n.d)) return left && left->reachable(d);
+			if (compare(n.d,d)) return right && right->reachable(d);
+			return true;
+		}
 	};
 	void clear(node& n)
 	{
@@ -863,6 +873,13 @@ template<typename dt,typename Compare=std::less<dt>> struct disk_tree // https:/
 					return ++i;
 			}
 		} return end();
+	}
+	// https://en.cppreference.com/w/cpp/container/set/contains
+	// thanks to GCC and gdb for showing me that contains calls find or something like that
+	// search for d in tree with binary search, if it can't be found it's not there
+	bool contains(const dt& d)
+	{
+		return root && root->reachable(d);
 	}
 	void popBalance(const iterator& i, bool depthDecreased)
 	{
