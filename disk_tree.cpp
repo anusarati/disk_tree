@@ -926,6 +926,7 @@ template<typename dt,typename Compare=std::less<dt>> struct disk_tree // https:/
 		// https://en.cppreference.com/w/cpp/iterator/make_reverse_iterator
 		reverse_iterator(iterator&& i) { forward=i; --forward; }
 		reverse_iterator(iterator& i) { forward=move(i); --forward; }
+		dt operator*() { return *forward; }
 		reverse_iterator& operator ++() { --forward; return *this; }
 		reverse_iterator& operator --() { ++forward; return *this; }
 		reverse_iterator& operator ++(int) { auto before=*this; --forward; return before; }
