@@ -19,19 +19,18 @@ template<typename dt, typename rt, typename ArgCompare=std::less<dt>> struct dis
 		//https://stackoverflow.com/a/19819249
 		mapped_t& operator=(const mapped_t& m)
 		{
-			return operator=(m.r.d);
+			return operator=(m.r.d.d); // r.d is node, d.d is rt
 		}
-		//mapped_t(const tree_t::iterator& i) { r=typename tree_t::reference(i); }
-		mapped_t(const iterator& i) { r=typename tree_t::reference(i); } // the compiler didn't understand
+		mapped_t(const iterator& i) { r=typename tree_t::reference(i); }
 		mapped_t& operator =(const rt& right)
 		{
-			r->d.second=right; // fortunately the iterator isn't const qualified ( if you want const qualification for a disk_set you can just use a const parameter for disk_tree )
+			r->d.d.second=right; // fortunately the iterator isn't const qualified ( if you want const qualification for a disk_set you can just use a const parameter for disk_tree )
 			r.write();
 			return *this;
 		}
 		//https://huixie90.github.io/Almost-always-const-auto-ref
 		mapped_t& operator =(const auto& something) { return operator=((rt)something); }
-		operator rt() { return r->d.second; }
+		operator rt() { return r->d.d.second; }
 	};
 	inline static pt incomplete_pair(auto&& first)
 	{
@@ -73,7 +72,7 @@ template<typename dt, typename rt, typename ArgCompare=std::less<dt>> struct dis
 		auto i=inner_insert(d);
 		return make_pair(iterator{i.first},i.second);
 	}
-	inline bool erase(const dt& d) { return tree.erase(d); }
+	inline bool erase(const dt& d) { return tree.erase(incomplete_pair(d)); }
 	using cpt=pair<const dt,rt>;
 	
 	iterator begin() { return tree.begin(); }
@@ -88,15 +87,16 @@ template<typename dt, typename rt, typename ArgCompare=std::less<dt>> struct dis
 	iterator upper_bound(const dt& arg) { return tree.upper_bound(incomplete_pair(arg)); }
 	iterator erase(const iterator& i)
 	{
-		return tree.erase(incomplete_pair(i.inner));
+		return tree.erase(i);
 	}
 	// https://en.cppreference.com/w/cpp/language/derived_class
 	struct node_type : tree_t::node_type
 	{
-		// https://en.cppreference.com/w/cpp/container/node_handle
 		// https://en.cppreference.com/w/cpp/language/this
-		dt& key() { return this->r->first; }
-		rt& mapped() { return this->r->second; }
+		node_type(const tree_t::node_type& p) { this->r=p.r; }
+		// https://en.cppreference.com/w/cpp/container/node_handle
+		dt& key() { return this->r->d.first; }
+		rt& mapped() { return this->r->d.second; }
 	};
 	node_type extract(const iterator& i)
 	{

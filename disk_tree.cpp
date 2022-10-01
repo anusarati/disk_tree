@@ -93,29 +93,61 @@ template<typename dt,typename Compare=std::less<dt>> struct disk_tree // https:/
 				return left->depth()+1;
 			}
 		}
-#define mNode(name,side)\
-		pair<node*,node*> name()\
-		{\
-			node* p,m=this;\
-			while (m->side)\
-			{\
-				p=m; m=m->side;\
-			}\
-			return make_pair(m,p);\
-		}
-		mNode(minNode,left); mNode(maxNode,right);
-#undef mNode
-		/*
-		pair<node*,node*> minNode()
+		// thanks to the calculus textbook by James Stewart
+		// and the ones by Edward Herman and Gilbert Strang https://openstax.org/details/books/calculus-volume-1
+		// for extreme name
+		// https://en.cppreference.com/w/cpp/utility/optional
+		template<bool min> optional<reference> extreme_branch()
 		{
-			node* p,m=this;
-			while (m->left)
+			auto& p=min ? left : right;
+			if (p)
 			{
-				p=m; m=m->left;
+				reference r;
+				// thanks to
+				// https://en.wikipedia.org/wiki/Optimizing_compiler#Loop_optimizations
+				do
+				{
+					r=*p;
+					p=min ? r->left : r->right;
+				} while (p);
+				return r;
 			}
-			return make_pair(m,p); // min node and its upper node
+			return nullopt;
 		}
-		*/
+		inline auto min_branch() { return extreme_branch<true>(); }
+		inline auto max_branch() { return extreme_branch<false>(); }
+		// returns the greatest or least value among this node and its branches
+		// thanks to Wikipedia article (https://en.wikipedia.org/wiki/AVL_tree ?) for the word subtree
+		template<bool min> dt extreme_section_value()
+		{
+			auto bo=extreme_branch<min>();
+			if (bo) return bo.value()->d;
+			return d;
+		}
+		inline auto min_section_value() { return extreme_section_value<true>(); }
+		inline auto max_section_value() { return extreme_section_value<false>(); }
+		// unnecessary?
+		template<bool min> optional<reference> extreme_ancestor()
+		{
+			auto& p=min ? left : right;
+			if (p)
+			{
+				reference a,r=*p;
+				if (p=min ? r->left : r->right)
+				{
+					do
+					{
+						a=r;
+						r=*p;
+						p=min ? r->left : r->right;
+					} while (p);
+					return a;
+				}
+			}
+			return nullopt;
+		}
+		inline auto min_ancestor() { return extreme_ancestor<true>(); }
+		inline auto max_ancestor() { return extreme_ancestor<false>(); }
 #ifndef NDEBUG
 	// thanks to Norman Megill and Metamath contributors
 		bool wellOrderedUnique()
@@ -363,7 +395,7 @@ template<typename dt,typename Compare=std::less<dt>> struct disk_tree // https:/
 				if (g) right=right->right; // if the first right branch is the minimum it can only have a right branch
 				n.d=m->d;
 				al.deallocate(&m);
-				eraseDepthBalance<false>(nr,depthDecreased);// depthDecreased is for parent
+				eraseDepthBalance<false>(nr,depthDecreased);// depthDecreased is also for parent if there is one
 			}
 			else { al.deallocate(np); np=pointer(nullptr); depthDecreased=true; } // no left because balance==0
 		}
@@ -377,14 +409,14 @@ template<typename dt,typename Compare=std::less<dt>> struct disk_tree // https:/
 			al.deallocate(&m);
 			eraseDepthBalance<true>(nr,depthDecreased);
 		}
-		--n;
+		--this->n;
 	}
 	// https://en.cppreference.com/w/cpp/container/node_handle
 	// https://eel.is/c++draft/container.node
 	struct preserved_node
 	{
 		reference r;
-		constexpr preserved_node() noexcept;
+		constexpr preserved_node() noexcept = default;
 		preserved_node(preserved_node&& n) noexcept { r=move(n.r); n.r.l=SIZE_MAX; }
 		preserved_node& operator =(preserved_node&& n) { if (&r) al.deallocate(&r); r=move(n.r); n.r.l=SIZE_MAX; }
 		~preserved_node() { if (&r) al.deallocate(&r); r.l=SIZE_MAX; }
@@ -411,13 +443,19 @@ template<typename dt,typename Compare=std::less<dt>> struct disk_tree // https:/
 			{
 				auto m=takeMin(right,depthDecreased,g);
 				m->left=n.left;
-				if (!g) m->maxNode().first->right=right;
+				if (!g)
+				{
+					auto mo=m->max_branch();
+					if (mo) mo.value()->right=right;
+					else m->right=right;
+				}
 				if (parent)
 				{
 					auto pr=*parent;
 					if (right) pr->right=&m;// thanks to en.cppreference.com
 					else pr->left=&m;
-					eraseDepthBalance<false>(nr,depthDecreased);// depthDecreased is for parent
+					// thanks to Norman Megill and Metamath contributors
+					eraseDepthBalance<false>(m,depthDecreased); // m takes the place of n in the tree and might need to be balanced
 				}
 				else root=&m;
 			}
@@ -429,17 +467,23 @@ template<typename dt,typename Compare=std::less<dt>> struct disk_tree // https:/
 			auto& left=n.left;
 			auto m=takeMax(left,depthDecreased,g);
 			m->right=n.right;
-			if (!g) m->minNode().first->left=n.left;
+			if (!g)
+			{
+				auto mo=m->min_branch();
+				if (mo) mo.value()->left=left;
+				else m->left=left;
+			}
 			if (parent)
 			{
 				auto pr=*parent;
 				if (right) pr->right=&m;
 				else pr->left=&m; // thanks to en.cppreference.com
-				eraseDepthBalance<true>(nr,depthDecreased);// depthDecreased is for parent
+				eraseDepthBalance<true>(m,depthDecreased);
 			}
 			else root=&m;
 		}
-		--n;
+		// thanks to my CS teacher Shankar Kumar
+		--this->n; // this->n is for number of elements
 	}
 	template<bool leftwards> void eraseDepthBalance(reference& nr, bool& depthDecreased)
 	{
@@ -690,7 +734,7 @@ template<typename dt,typename Compare=std::less<dt>> struct disk_tree // https:/
 			}
 			return *this;
 		}
-		dt peek() // get next element without advancing iterator (like std::basic_istream::peek() https://en.cppreference.com/w/cpp/io/basic_istream/peek)
+		dt peek() const // get next element without advancing iterator (like std::basic_istream::peek() https://en.cppreference.com/w/cpp/io/basic_istream/peek)
 		{
 			auto& p=nodes[level];
 			if (p)
@@ -699,8 +743,8 @@ template<typename dt,typename Compare=std::less<dt>> struct disk_tree // https:/
 				auto l=level;
 				if (c)
 				{
-					auto mu=nodes[l+1]->minNode();
-					return mu.first->d;
+					auto r=*c;
+					return r->min_section_value();
 				}
 				else
 				{
@@ -886,9 +930,11 @@ template<typename dt,typename Compare=std::less<dt>> struct disk_tree // https:/
 	{
 		return root && root->reachable(d);
 	}
+	// balance after taking away top of iterator's node stack (nodes[level])
+	// thanks to Creel and GCC and en.cppreference.com and whoever taught me about stack
 	void popBalance(const iterator& i, bool depthDecreased)
 	{
-		for (char l=i.level-1;depthDecreased && i>=0;i++) // stop as early as possible to avoid disk reads
+		for (char l=i.level-1;depthDecreased && l>=0;--l) // stop as early as possible to avoid disk reads
 		{
 			auto nr=reference(i.nodes[l]);
 			if (i.rightLevels[l]) eraseDepthBalance<false>(nr,depthDecreased);
@@ -918,7 +964,7 @@ template<typename dt,typename Compare=std::less<dt>> struct disk_tree // https:/
 		{
 			auto u=i.level-1;
 			extract(i.nodes[u],i.rightLevels[u],np,r,depthDecreased);
-			popBalance(depthDecreased);
+			popBalance(i,depthDecreased);
 		}
 		else extract(nullptr,false,np,r,depthDecreased);
 		return preserved_node{move(r)};
@@ -932,8 +978,8 @@ template<typename dt,typename Compare=std::less<dt>> struct disk_tree // https:/
 		dt operator*() { return *forward; }
 		reverse_iterator& operator ++() { --forward; return *this; }
 		reverse_iterator& operator --() { ++forward; return *this; }
-		reverse_iterator& operator ++(int) { auto before=*this; --forward; return before; }
-		reverse_iterator& operator --(int) { auto before=*this; ++forward; return before; }
+		reverse_iterator operator ++(int) { auto before=*this; --forward; return before; }
+		reverse_iterator operator --(int) { auto before=*this; ++forward; return before; }
 		operator pointer() { return pointer(forward); }
 		// https://en.cppreference.com/w/cpp/language/explicit
 		explicit operator pointer&() { return (pointer&)(forward); }
@@ -954,22 +1000,7 @@ template<typename dt,typename Compare=std::less<dt>> struct disk_tree // https:/
 	static reverse_iterator make_reverse_iterator(iterator i) { return reverse_iterator(i); }
 	dt front()
 	{
-		return *root->minNode()->first;
-	}
-	void pop_front()
-	{
-		if (root)
-		{
-			auto p=root->minNode()->second;
-			if (p) clear(p.left);
-		}
-	}
-	dt front_and_pop() // like JS Array.prototype.pop()
-	{
-		auto ns=root->minNode();
-		auto d=ns->first->d,p=ns->second;
-		if (p) clear(p.left);
-		return d;
+		return root->extreme_section_value(); // this isn't properly defined without root, i.e. without any elements
 	}
 	unsigned char depth()
 	{
