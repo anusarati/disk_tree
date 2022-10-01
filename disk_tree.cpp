@@ -555,6 +555,7 @@ template<typename dt,typename Compare=std::less<dt>> struct disk_tree // https:/
 		}
 	}
 	size_t size() { return n; }
+	bool empty() { return !n; }
 	// mimic std::set::insert https://en.cppreference.com/w/cpp/container/set/insert
 	pair<auto,bool> insert(const dt& d)
 	{

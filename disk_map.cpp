@@ -51,6 +51,7 @@ template<typename dt, typename rt, typename ArgCompare=std::less<dt>> struct dis
 	inline auto inner_find(const dt& d) { return tree.find(incomplete_pair(d)); }
 	tree_t tree;
 	size_t size() { return tree.size(); }
+	bool empty() { return tree.empty(); }
 	mapped_t at(const dt& arg)
 	{
 		if (tree.root) return inner_find(arg);
