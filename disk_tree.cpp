@@ -917,6 +917,7 @@ template<typename dt,typename Compare=std::less<dt>> struct disk_tree // https:/
 		//https://en.cppreference.com/w/cpp/language/operators
 		pointer operator ->() { return forward; }
 		operator reference() const { return reference(forward); }
+		bool operator ==(const reverse_iterator& i) { return forward==i.forward; }
 	};
 	reverse_iterator rbegin()
 	{
