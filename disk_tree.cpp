@@ -143,10 +143,10 @@ template<typename dt,typename Compare=std::less<dt>> struct disk_tree // https:/
 		// used to implement contains
 		// thanks to GCC and gdb for showing me that contains calls find or something like that
 		// search for d in tree with binary search, if it can't be found it's not there
-		bool reachable(const dt& d)
+		bool reachable(const dt& r)
 		{
-			if (compare(d,n.d)) return left && left->reachable(d);
-			if (compare(n.d,d)) return right && right->reachable(d);
+			if (compare(r,d)) return left && left->reachable(r);
+			if (compare(d,r)) return right && right->reachable(r);
 			return true;
 		}
 	};
