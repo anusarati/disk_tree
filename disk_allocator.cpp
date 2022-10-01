@@ -147,6 +147,11 @@ template<typename t> struct disk_allocator
 		deallocate(move(p));
 		p.l=SIZE_MAX;
 	}
+	void deallocate(reference& r)
+	{
+		push_space(move(r.l));
+		r.l=SIZE_MAX;
+	}
 	//https://en.cppreference.com/w/cpp/named_req/Allocator
 	constexpr disk_allocator() noexcept {}
 	//template<class w> constexpr disk_allocator(const disk_allocator<w>& da) { fs=move(da.fs); }

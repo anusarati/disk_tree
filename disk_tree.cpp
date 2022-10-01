@@ -14,19 +14,21 @@ template<typename dt,typename Compare=std::less<dt>> struct disk_tree // https:/
 {
 	// the allocations are for nodes
 	struct node;
-	static inline disk_allocator<node> al{}; // the allocator is for allocating nodes
+	// https://en.cppreference.com/w/cpp/container/set
+	typedef disk_allocator<node> allocator_type;
+	static inline allocator_type al{}; // the allocator is for allocating nodes
 	static inline Compare compare{};
 
 	static void init_allocator()
 	{
-		disk_allocator<node>::init();
+		allocator_type::init();
 	}
 	static void init_allocator(auto&& dstream, auto&& sstream)
 	{
-		disk_allocator<node>::init(dstream,sstream);
+		allocator_type::init(dstream,sstream);
 	}
-	using pointer=disk_allocator<node>::pointer;
-	using reference=disk_allocator<node>::reference;
+	using pointer=allocator_type::pointer;
+	using reference=allocator_type::reference;
 	void clear(pointer& p)
 	{
 #ifdef debug
@@ -976,7 +978,7 @@ template<typename dt,typename Compare=std::less<dt>> struct disk_tree // https:/
 };
 
 // https://en.cppreference.com/w/cpp/iterator/make_reverse_iterator
-template<typename dt, typename Compare> disk_tree<dt,Compare>::reverse_iterator make_reverse_iterator(disk_tree<dt,Compare>::iterator i)
+template<typename dt, typename Compare> disk_tree<dt,Compare>::reverse_iterator make_reverse_iterator(typename disk_tree<dt,Compare>::iterator i)
 {
 	return disk_tree<dt,Compare>::reverse_iterator(i);
 }
