@@ -334,7 +334,7 @@ template<typename dt,typename Compare=std::less<dt>> struct disk_tree // https:/
 		{
 			side=al.allocate(); *side=node{d};
 			leftwards ? n.balance-- : n.balance++;
-			updated_memo=false;
+			reset_memo();
 			if (leftwards ? !n.right : !n.left) depthIncreased=true;
 			nr.write();
 			return true;
@@ -449,7 +449,7 @@ template<typename dt,typename Compare=std::less<dt>> struct disk_tree // https:/
 		else if (compare(n.d,f)) return erase<false>(nr,n,f,depthDecreased); // check right branch to erase ( leftwards=false )
 		else
 		{
-			erase(np,nr,depthDecreased); updated_memo=false;
+			erase(np,nr,depthDecreased); reset_memo();
 			return true;
 		}
 	}
@@ -531,7 +531,7 @@ template<typename dt,typename Compare=std::less<dt>> struct disk_tree // https:/
 		else if (compare(n.d,f)) return extract<false>(nr,n,f,depthDecreased); // check right branch to extract ( leftwards=false )
 		else
 		{
-			extract<left_ancestor>(ancestor,np,nr,depthDecreased); updated_memo=false;
+			extract<left_ancestor>(ancestor,np,nr,depthDecreased); reset_memo();
 			return nr;
 		}
 	}
@@ -555,7 +555,7 @@ template<typename dt,typename Compare=std::less<dt>> struct disk_tree // https:/
 				else root=&resume<true>(n.left,n.right,depthDecreased);
 				// thanks to my CS teacher Shankar Kumar
 				--this->n; // this->n is for number of elements
-				updated_memo=false;
+				reset_memo();
 				return r;
 			}
 		}
@@ -643,7 +643,7 @@ template<typename dt,typename Compare=std::less<dt>> struct disk_tree // https:/
 		else
 		{
 			root=al.allocate();*root=node{d};
-			n++; updated_memo=false; inserted=true;
+			n++; reset_memo(); inserted=true;
 			i={root};
 		}
 		// thanks to Errichto for using make_pair and William Lin
@@ -857,25 +857,38 @@ template<typename dt,typename Compare=std::less<dt>> struct disk_tree // https:/
 	// because I think the checks would happen a logarithmic number of times anyways
 	// optional caching to have sometimes constant time
 	// actually copying the iterators could take logarithmic time anyways in this implementation
+	// https://en.wikipedia.org/wiki/Memoization
+	// https://en.wikipedia.org/wiki/Cache_(computing)
 	protected: iterator begin_memo, end_memo;
-	bool updated_memo:1=false;
+	bool begin_updated_memo:1=false, end_updated_memo:1=false;
+	   // I had mistakenly used a single flag for whether both caches were updated, but only updated one of them when turning the flag on
 	public:
 	iterator begin()
 	{
-		if (updated_memo) return begin_memo;
+		if (begin_updated_memo) return begin_memo;
 		iterator i{root};
-		i.traverseMin();
-		begin_memo=move(i); updated_memo=true;
+		if (root!=nullptr) // makes this work with comparison with end iterator for empty tree
+		{
+			i.traverseMin();
+		}
+		begin_memo=move(i); begin_updated_memo=true;// I had forgotten to update it for an empty tree earlier
 		return i;
 	}
 	iterator end()
 	{
-		if (updated_memo) return end_memo;
+		if (end_updated_memo) return end_memo;
 		iterator i{root};
-		i.traverseMax();
-		i.rightLevels[i.level++]=true;
-		end_memo=move(i); updated_memo=true;
+		if (root)
+		{
+			i.traverseMax();
+			i.rightLevels[i.level++]=true;
+		}
+		end_memo=move(i); end_updated_memo=true;
 		return end_memo;
+	}
+	inline void reset_memo()
+	{
+		begin_updated_memo=false; end_updated_memo=false;
 	}
 	// thanks to cppreference for showing enum definition in one line
 	// https://en.cppreference.com/w/cpp/language/enum
@@ -965,7 +978,7 @@ template<typename dt,typename Compare=std::less<dt>> struct disk_tree // https:/
 			if (i.rightLevels[l]) eraseDepthBalance<false>(nr,depthDecreased);
 			else eraseDepthBalance<true>(nr,depthDecreased);
 		}
-		updated_memo=false;
+		reset_memo();
 	}
 	iterator erase(const iterator& i) // the iterator's nodes data should contain the same pointers even if the pointed data changes
 	{
