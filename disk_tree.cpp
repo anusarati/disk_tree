@@ -156,7 +156,7 @@ template<typename dt,typename Compare=std::less<dt>> struct disk_tree // https:/
 			if (right && !right->wellOrderedGreaterThan(d)) return false;
 			return true;
 		}
-		bool wellOrderedGreaterThan(const dt& lesser) // assuming lesser is from parent, then everything in its right branch should be greater
+		bool wellOrderedGreaterThan(const dt& lesser) // assuming lesser is from ancestor, then everything in its right branch should be greater
 		{
 			if (!compare(lesser,d)) return false;
 			if (left && !left->wellOrderedGreaterThan(lesser)) return false;
@@ -351,35 +351,43 @@ template<typename dt,typename Compare=std::less<dt>> struct disk_tree // https:/
 		return false;
 		//cout<<' '<<n.d<<' '<<n.left.l<<' '<<n.right.l<<endl;
 	}
-	// g for got it
-#define takeM(M, s1, s2, dbl)\
-	reference M(const pointer& np,bool& depthDecrease, bool& g)\
-	{\
-		auto nr=*np; auto& n=nr.d;\
-		if (n.s1)\
-		{\
-			auto m=M(n.s1,depthDecrease,g);\
-			/* executes for immediate descendant only, if it's the min or max */\
-			if (g)\
-			{\
-				/* the descendants of a min node are all to its right, and of a max node are all to the left */\
-				n.s1=m->s2;\
-				g=false;\
-			}\
-			depthBalance<dbl,false>(nr,depthDecrease);\
-			nr.write();\
-			return m;\
-		}\
-		else\
-		{\
-			depthDecrease=true;\
-			g=true;\
-			return nr;\
-		}\
+	template<bool leftwards> reference take_extreme_node(const pointer& np,bool& depthDecrease, bool& g)
+	{
+		auto nr=*np; auto& n=nr.d;
+		auto& side=leftwards ? n.left : n.right;
+		if (side)
+		{
+			auto m=take_extreme_node<leftwards>(side,depthDecrease,g);
+			/* executes for immediate descendant only, if it's the min or max */
+			if (g) // g for got it
+			{
+				/* the descendants of a min node are all to its right, and of a max node are all to the left */
+				side= leftwards ? m->right : m->left;
+				g=false;
+			}
+			depthBalance<!leftwards,false>(nr,depthDecrease); // taking it from the left means balance has increased to the right
+			nr.write();
+			return m;
+		}
+		else
+		{
+			depthDecrease=true;
+			g=true;
+			return nr;
+		}
 	}
-	takeM(takeMin,left,right,false);
-	takeM(takeMax,right,left,true);
-#undef takeM
+	inline reference take_min(const pointer& np,bool& depthDecrease, bool& g) { return take_extreme_node<true>(np,depthDecrease,g); }
+	inline reference take_max(const pointer& np,bool& depthDecrease, bool& g) { return take_extreme_node<false>(np,depthDecrease,g); }
+	// replaces a node with a node of an adjacent value
+	template<bool leftwards> void resume(pointer& side, bool& depthDecreased, node& n, reference& nr)
+	{
+		bool g=false;
+		auto m=take_extreme_node<!leftwards>(side,depthDecreased,g);
+		if (g) side=leftwards ? side->left : side->right;// if the first right branch is the minimum it can only have a right branch
+		n.d=m->d;
+		al.deallocate(&m);
+		eraseDepthBalance<leftwards>(nr,depthDecreased);// depthDecreased is also for ancestor if there is one
+	}
 	// erase node at reference
 	// pass pointer to nullify it if it has no branches
 	void erase(pointer& np, reference& nr, bool& depthDecreased)
@@ -387,104 +395,15 @@ template<typename dt,typename Compare=std::less<dt>> struct disk_tree // https:/
 		auto& n=nr.d;
 		if (n.balance>=0)
 		{
-			bool g=false;
 			auto& right=n.right;
-			if (right) // rotate left
-			{
-				auto m=takeMin(right,depthDecreased,g);
-				if (g) right=right->right; // if the first right branch is the minimum it can only have a right branch
-				n.d=m->d;
-				al.deallocate(&m);
-				eraseDepthBalance<false>(nr,depthDecreased);// depthDecreased is also for parent if there is one
-			}
+			if (right) resume<false>(right,depthDecreased,n,nr); // rotate left
 			else { al.deallocate(np); np=pointer(nullptr); depthDecreased=true; } // no left because balance==0
 		}
-		else
-		{
-			bool g=false;
-			auto& left=n.left;
-			auto m=takeMax(left,depthDecreased,g);
-			if (g) left=left->left;
-			n.d=m->d;
-			al.deallocate(&m);
-			eraseDepthBalance<true>(nr,depthDecreased);
-		}
+		else resume<true>(n.left,depthDecreased,n,nr); // if balance <0 and the tree is working properly there must be a left branch
 		--this->n;
 	}
-	// https://en.cppreference.com/w/cpp/container/node_handle
-	// https://eel.is/c++draft/container.node
-	struct preserved_node
-	{
-		reference r;
-		constexpr preserved_node() noexcept = default;
-		preserved_node(preserved_node&& n) noexcept { r=move(n.r); n.r.l=SIZE_MAX; }
-		preserved_node& operator =(preserved_node&& n) { if (&r) al.deallocate(&r); r=move(n.r); n.r.l=SIZE_MAX; }
-		~preserved_node() { if (&r) al.deallocate(&r); r.l=SIZE_MAX; }
-		[[nodiscard]] bool empty() const noexcept { return !&r; }
-		explicit operator bool() const noexcept { return bool(&r); }
-		dt& value() const { return r->d; }
-		// thanks to those who taught/reminded me about using a temporary variable for swap
-		void swap(preserved_node& n) noexcept { auto intermediate=move(n); n=move(*this); *this=move(intermediate); }
-		preserved_node(reference&& rr) : r(rr) {}
-	};
-	typedef preserved_node node_type; // this isn't used except for extract
-	// why would the branch pointers matter if the branches aren't extracted from the tree with the node? why extract the node and not its value()?
-	// https://en.cppreference.com/w/cpp/container/set/extract
-	// this uses right instead of left because iterator stores rightLevels
-	// this doesn't return a preserved_node because the argument nr can be used right afterwards to construct it
-	void extract(const pointer& parent, const bool& right, pointer& np, const reference& nr, bool& depthDecreased) 
-	{
-		auto& n=nr.d;
-		if (n.balance>=0)
-		{
-			bool g=false;
-			auto& right=n.right;
-			if (right) // rotate left
-			{
-				auto m=takeMin(right,depthDecreased,g);
-				m->left=n.left;
-				if (!g)
-				{
-					auto mo=m->max_branch();
-					if (mo) mo.value()->right=right;
-					else m->right=right;
-				}
-				if (parent)
-				{
-					auto pr=*parent;
-					if (right) pr->right=&m;// thanks to en.cppreference.com
-					else pr->left=&m;
-					// thanks to Norman Megill and Metamath contributors
-					eraseDepthBalance<false>(m,depthDecreased); // m takes the place of n in the tree and might need to be balanced
-				}
-				else root=&m;
-			}
-			else { np=pointer(nullptr); depthDecreased=true; } // no left because balance==0
-		}
-		else
-		{
-			bool g=false;
-			auto& left=n.left;
-			auto m=takeMax(left,depthDecreased,g);
-			m->right=n.right;
-			if (!g)
-			{
-				auto mo=m->min_branch();
-				if (mo) mo.value()->left=left;
-				else m->left=left;
-			}
-			if (parent)
-			{
-				auto pr=*parent;
-				if (right) pr->right=&m;
-				else pr->left=&m; // thanks to en.cppreference.com
-				eraseDepthBalance<true>(m,depthDecreased);
-			}
-			else root=&m;
-		}
-		// thanks to my CS teacher Shankar Kumar
-		--this->n; // this->n is for number of elements
-	}
+	
+
 	template<bool leftwards> void eraseDepthBalance(reference& nr, bool& depthDecreased)
 	{
 		depthBalance<!leftwards,false>(nr,depthDecreased);
@@ -505,7 +424,6 @@ template<typename dt,typename Compare=std::less<dt>> struct disk_tree // https:/
 		// thanks to The Coding Train or William Lin or whoever taught me that else is not necessary because return returns from the function
 		return false;
 	}
-	
 	/*
 	void eraseRight(reference& nr, dt& f, bool& depthDecreased, bool& erased)
 	{
@@ -523,7 +441,7 @@ template<typename dt,typename Compare=std::less<dt>> struct disk_tree // https:/
 		}
 	}
 	*/
-
+	
 	bool erase(pointer& np, const dt& f, bool& depthDecreased)
 	{
 		auto nr=*np; auto& n=nr.d;
@@ -535,7 +453,114 @@ template<typename dt,typename Compare=std::less<dt>> struct disk_tree // https:/
 			return true;
 		}
 	}
-
+	// https://en.cppreference.com/w/cpp/container/node_handle
+	// https://eel.is/c++draft/container.node
+	struct preserved_node
+	{
+		reference r;
+		constexpr preserved_node() noexcept : r() {} // r's location should be where a disk nullptr would point to
+		preserved_node(preserved_node&& n) noexcept { r=move(n.r); n.r.l=SIZE_MAX; }
+		preserved_node& operator =(preserved_node&& n) { if (&r) al.deallocate(&r); r=move(n.r); n.r.l=SIZE_MAX; }
+		~preserved_node() { if (&r) al.deallocate(&r); r.l=SIZE_MAX; }
+		[[nodiscard]] bool empty() const noexcept { return !&r; }
+		explicit operator bool() const noexcept { return bool(&r); }
+		dt& value() const { return r->d; }
+		// thanks to those who taught/reminded me about using a temporary variable for swap
+		void swap(preserved_node& n) noexcept { auto intermediate=move(n); n=move(*this); *this=move(intermediate); }
+		preserved_node(reference&& rr) : r(rr) {}
+	};
+	typedef preserved_node node_type; // this isn't used except for extract
+	template<bool leftwards> inline reference resume(const pointer& side, const pointer& other_side, bool& depthDecreased)
+	{
+		bool g=false;
+		auto m=take_extreme_node<!leftwards>(side,depthDecreased,g);
+		if (leftwards)
+		{
+			if (g) m->left=side;
+			m->right=other_side;
+		}
+		else
+		{
+			if (g) m-right=side;
+			m->left=other_side;
+		}
+		// thanks to Norman Megill and Metamath contributors
+		if (g) eraseDepthBalance<leftwards>(m,depthDecreased); // m takes the place of n in the tree and might need to be balanced
+		return m;
+	}
+	// left_ancestor means whether the node is the ancestor's right branch
+	template<bool leftwards, bool left_ancestor> inline void resume(const pointer& side, const pointer& other_side, bool& depthDecreased, reference& ancestor)
+	{
+		auto m=resume<leftwards>(side,other_side,depthDecreased);
+		if (left_ancestor) ancestor->right=&m;// thanks to en.cppreference.com
+		else ancestor->left=&m;
+	}
+	// why would the branch pointers matter if the branches aren't extracted from the tree with the node? why extract the node and not its value()?
+	// it would extract the node anyways with the reference so that it's written upon destruction
+	// https://en.cppreference.com/w/cpp/container/set/extract
+	// this doesn't return a preserved_node because the argument nr can be used right afterwards to construct it
+	template<bool left_ancestor> void extract(reference& ancestor, pointer& np, const reference& nr, bool& depthDecreased) 
+	{
+		auto& n=nr.d;
+		if (n.balance>=0)
+		{
+			auto& right=n.right;
+			if (right) resume<false,left_ancestor>(right,n.left,depthDecreased,ancestor);// rotate left
+			else { np=pointer(nullptr); depthDecreased=true; } // no left because balance==0
+		}
+		else resume<true,left_ancestor>(n.left,n.right,depthDecreased,ancestor)
+		// thanks to my CS teacher Shankar Kumar
+		--(this->n); // this->n is for number of elements
+	}
+	template<bool leftwards> preserved_node extract(reference& nr, node&n, const dt& f, bool& depthDecreased)
+	{
+		pointer& side = leftwards ? n.left : n.right;
+		if (side)
+		{
+			auto x=extract(nr,side,f,depthDecreased);
+			if (bool(x)) eraseDepthBalance<leftwards>(nr,depthDecreased);
+			return x; // don't construct default preserved_node several times if there wasn't an extraction
+		}
+		// thanks to https://en.cppreference.com/w/cpp/utility/optional for {} without writing preserved_node next to it
+		return {};
+	}
+	template<bool left_ancestor> preserved_node extract(reference& ancestor, pointer& np, const dt& f, bool& depthDecreased)
+	{
+		auto nr=*np; auto& n=nr.d;
+		if (compare(f,n.d)) return extract<true>(nr,n,f,depthDecreased); // check left branch to extract ( leftwards=true )
+		else if (compare(n.d,f)) return extract<false>(nr,n,f,depthDecreased); // check right branch to extract ( leftwards=false )
+		else
+		{
+			extract<left_ancestor>(ancestor,np,nr,depthDecreased); updated_memo=false;
+			return nr;
+		}
+	}
+	preserved_node extract(const dt& f)
+	{
+		if (root)
+		{
+			auto r=*root; auto& n=r.d;
+			bool depthDecreased=false;
+			if (compare(f,n.d)) return extract<false>(r,n,f,depthDecreased);
+			else if (compare(n.d,f)) return extract<true>(r,n,f,depthDecreased);
+			else
+			{
+				if (n.balance>=0)
+				{
+					auto& right=n.right;
+					if (right)
+						root=&resume<false>(right,n.left,depthDecreased);// rotate left
+					else root=pointer(nullptr); // no left because balance==0 because if balance>0 and the tree is working properly there would be a right branch
+				}
+				else root=&resume<true>(n.left,n.right,depthDecreased);
+				// thanks to my CS teacher Shankar Kumar
+				--this->n; // this->n is for number of elements
+				updated_memo=false;
+				return r;
+			}
+		}
+		return {};
+	}
 	pointer root;
 	size_t n=0;
 	disk_tree() {}
@@ -636,7 +661,7 @@ template<typename dt,typename Compare=std::less<dt>> struct disk_tree // https:/
 	{
 		iterator()=default;
 		iterator(const pointer& p) { nodes[0]=p; }
-		pointer nodes[8*sizeof(size_t)];// parents then current child up to level
+		pointer nodes[8*sizeof(size_t)];// ancestors then current child up to level
 		unsigned char level=0;
 		// if there are 8*sizeof(size_t) levels, a full AVL tree would have SIZE_MAX elements
 		std::bitset<8*sizeof(size_t)> rightLevels; // used like a stack, with the 1 bits representing which nodes had their right child node reached
@@ -715,7 +740,7 @@ template<typename dt,typename Compare=std::less<dt>> struct disk_tree // https:/
 					{
 						auto bl=level;
 						while (level>0 && rightLevels[level-1]) --level;
-						if (level>0)// right parent
+						if (level>0)// right ancestor
 							level--;
 						else { level=bl+1; rightLevels[bl]=true; if (level<64) nodes[level]=nullptr; return *this; }
 						auto reset=(bitset<8*sizeof(size_t)>)SIZE_MAX >> (8*sizeof(size_t)-1-level); // it could fail depending on endianness without the conversion to bitset
@@ -749,7 +774,7 @@ template<typename dt,typename Compare=std::less<dt>> struct disk_tree // https:/
 				else
 				{
 					while (l>0 && rightLevels[l-1]) --l;
-					if (l>0)// right parent
+					if (l>0)// right ancestor
 						l--;
 					else return dt{};
 					return nodes[l]->d;

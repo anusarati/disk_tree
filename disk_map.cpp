@@ -24,13 +24,14 @@ template<typename dt, typename rt, typename ArgCompare=std::less<dt>> struct dis
 		mapped_t(const iterator& i) { r=typename tree_t::reference(i); }
 		mapped_t& operator =(const rt& right)
 		{
-			r->d.d.second=right; // fortunately the iterator isn't const qualified ( if you want const qualification for a disk_set you can just use a const parameter for disk_tree )
+			// why is r->d considered the node's d here? because it's r.d.d
+			r->d.second=right; // fortunately the iterator isn't const qualified ( if you want const qualification for a disk_set you can just use a const parameter for disk_tree )
 			r.write();
 			return *this;
 		}
 		//https://huixie90.github.io/Almost-always-const-auto-ref
 		mapped_t& operator =(const auto& something) { return operator=((rt)something); }
-		operator rt() { return r->d.d.second; }
+		operator rt() { return r->d.second; }
 	};
 	inline static pt incomplete_pair(auto&& first)
 	{
@@ -44,8 +45,6 @@ template<typename dt, typename rt, typename ArgCompare=std::less<dt>> struct dis
 	{
 		tree_t::init_allocator(dstream,sstream);
 	}
-	inline void minit_allocator() { init_allocator(); } // as member function
-	inline void minit_allocator(auto&& dstream, auto&& sstream) { init_allocator(dstream,sstream); } // as member function
 	inline auto inner_insert(const dt& d) { return tree.insert(incomplete_pair(d)); }
 	inline auto inner_find(const dt& d) { return tree.find(incomplete_pair(d)); }
 	tree_t tree;
@@ -81,6 +80,7 @@ template<typename dt, typename rt, typename ArgCompare=std::less<dt>> struct dis
 	{
 		return inner_find(arg);
 	}
+	bool contains(const dt& arg) { return tree.contains(incomplete_pair(arg)); }
 	// https://en.cppreference.com/w/cpp/container/map/lower_bound
 	iterator lower_bound(const dt& arg) { return tree.lower_bound(incomplete_pair(arg)); }
 	// https://en.cppreference.com/w/cpp/container/map/upper_bound
