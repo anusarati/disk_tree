@@ -1,43 +1,11 @@
-#include <vector>
-#include <memory>
-#include <cinttypes>
-#include <cstdio>
 #include <iostream>
 #include <concepts>
-#include <array>
-#include <cmath>
-#include <any>
-#include <list>
-#include <cassert>
-#include <random>
 #include <set>
-#include <typeinfo>
-#include <bitset>
-#include <chrono>
-#include <utility>
-#include <deque>
-#include <map>
-#include <cstdlib>
 using namespace std;
-using namespace chrono;
 
-#include <forward_list>
-#include <stack>
-
-#include <functional>
-#include <ctime>
-#include <cinttypes>
-#include <typeinfo>
-#include <fstream>
-#include <bit>
 #include "disk_map.cpp"
 #include <random>
-struct Cplus // c plus
-{
-	size_t plus=0;
-	Cplus& operator ++() { ++plus; return *this; }
-	Cplus& operator ++(int) { auto bp=new Cplus{*this}; operator ++(); return *bp; }
-};
+#include <cassert>
 int main()
 {
 	disk_map<int,int> m;
@@ -77,15 +45,15 @@ int main()
 	assert(t.root->correctBalance());
 	cout<<"std::set and disk_tree comparison\n";
 	assert(t.size()==v.size());
-	auto a=t.begin();
-	auto b=v.begin();
+	auto vi=v.begin();
 	// thanks to The Cherno and the people who taught for (int i= ... 
-	for (size_t i=0; i<v.size(); ++i)
+	for (auto&& l:t)
 	{
-		assert(*a==*b);
-		cout<<*a<<' '<<*b<<'\n';
-		++a; ++b;
+		assert(l==*vi);
+		cout<<l<<' '<<*vi<<'\n';
+		++vi;
 	}
+	assert(vi==v.end());
 	/*
 	 //to expose to GDB
 	--t.end();

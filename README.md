@@ -8,6 +8,9 @@ For other implementations of AVL trees see Ben Pfaff's
 
 It might not work well with std dynamically allocated types (e.g. std::string) because I think it could attempt to free the memory in RAM multiple times after getting references to the same disk memory, reading in the object, and letting the reference go out of scope, which calls its destructor and the destructor of the object data.
 
+## Testing
+g++ --std=c++2a test.cpp && ./a.out
+
 ## LICENSE
 0BSD
 
