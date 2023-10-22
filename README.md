@@ -1,5 +1,7 @@
 # Disk Tree
 
+Made when I had less experience with C++ and inheritance
+
 Implements an AVL tree that allocates its nodes on a file, which can be stored
 on a disk. Also implements some parts of std::set and std::map.
 
