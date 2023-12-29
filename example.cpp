@@ -1,17 +1,3 @@
-# Disk Tree
-
-Implements an AVL tree that allocates its nodes on a file, which can be stored
-on a disk. Also implements some parts of std::set and std::map.
-
-Written mostly in 2022. A light touchup was given to improve the code quality, but there are no plans to maintain the code.
-
-For other implementations of AVL trees see Ben Pfaff's
-[website](https://adtinfo.org/).
-
-This doesn't support reading/writing heap allocated types like std::string because it uses direct binary deserialization from a file.
-
-## Example
-```c++
 #include <iostream>
 #include <random>
 
@@ -44,11 +30,3 @@ int main()
     }
     return 0;
 }
-```
-
-Output
-
-![Example output](example.jpg)
-
-## LICENSE
-[0BSD](LICENSE)

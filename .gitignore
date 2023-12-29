@@ -2,4 +2,6 @@
 old
 o
 *.out
+*.o
 *.swp
+.vscode
